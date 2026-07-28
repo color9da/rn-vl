@@ -7896,5 +7896,22 @@
             "recycled": true,
             "published_at": "2026-07-28T13:53:17.913789Z"
         }
+    },
+    {
+        "video_name": "Avatar_Video_1.mp4",
+        "metadata": {
+            "title": "Living my wildest dreams \u2728",
+            "description": "Dancing through life's beautiful moments \ud83d\udc83 #wildandfree #dancing #soulful #wildestdreams",
+            "success_flags": {
+                "instagram_reel": true,
+                "instagram_story": true,
+                "facebook_reel": true,
+                "facebook_story": true,
+                "threads": false,
+                "youtube": false
+            },
+            "recycled": true,
+            "published_at": "2026-07-28T19:19:26.600970Z"
+        }
     }
 ]
