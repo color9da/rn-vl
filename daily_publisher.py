@@ -219,17 +219,27 @@ def main():
     except Exception as e:
         print(f"⚠️ Pre-hosting video URL warning: {e}")
 
-    # Instagram Reels
+    # Instagram Reels (Direct Resumable)
     try:
-        upload_to_instagram(video_path, combined_caption, is_story=False, video_url=public_video_url)
-        success_flags["instagram_reel"] = True
+        ig_res = upload_to_instagram(video_path, combined_caption, is_story=False)
+        if isinstance(ig_res, dict) and ig_res.get('status') == 'success':
+            success_flags["instagram_reel"] = True
+        elif isinstance(ig_res, dict) and ig_res.get('status') == 'skipped':
+            print(f"⚠️ Instagram Reel skipped: {ig_res.get('reason')}")
+        else:
+            raise Exception(ig_res.get('error', 'Instagram Reel failed') if isinstance(ig_res, dict) else 'Failed')
     except Exception as e:
         print(f"❌ Instagram Reel upload failed: {e}")
         
-    # Instagram Stories
+    # Instagram Stories (Direct Resumable)
     try:
-        upload_to_instagram(video_path, combined_caption, is_story=True, video_url=public_video_url)
-        success_flags["instagram_story"] = True
+        ig_story_res = upload_to_instagram(video_path, combined_caption, is_story=True)
+        if isinstance(ig_story_res, dict) and ig_story_res.get('status') == 'success':
+            success_flags["instagram_story"] = True
+        elif isinstance(ig_story_res, dict) and ig_story_res.get('status') == 'skipped':
+            print(f"⚠️ Instagram Story skipped: {ig_story_res.get('reason')}")
+        else:
+            raise Exception(ig_story_res.get('error', 'Instagram Story failed') if isinstance(ig_story_res, dict) else 'Failed')
     except Exception as e:
         print(f"❌ Instagram Story upload failed: {e}")
         
