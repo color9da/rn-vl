@@ -210,16 +210,25 @@ def main():
         "youtube": False
     }
     
+    # Acquire public video URL once so Instagram Reels, Instagram Stories, and Threads reuse it
+    public_video_url = None
+    try:
+        from upload.video_host import get_public_video_url
+        print("\n🌐 Preparing public video URL for social platforms...")
+        public_video_url = get_public_video_url(video_path)
+    except Exception as e:
+        print(f"⚠️ Pre-hosting video URL warning: {e}")
+
     # Instagram Reels
     try:
-        upload_to_instagram(video_path, combined_caption, is_story=False)
+        upload_to_instagram(video_path, combined_caption, is_story=False, video_url=public_video_url)
         success_flags["instagram_reel"] = True
     except Exception as e:
         print(f"❌ Instagram Reel upload failed: {e}")
         
     # Instagram Stories
     try:
-        upload_to_instagram(video_path, combined_caption, is_story=True)
+        upload_to_instagram(video_path, combined_caption, is_story=True, video_url=public_video_url)
         success_flags["instagram_story"] = True
     except Exception as e:
         print(f"❌ Instagram Story upload failed: {e}")
@@ -240,7 +249,7 @@ def main():
         
     # Threads
     try:
-        upload_to_threads(video_path, combined_caption)
+        upload_to_threads(video_path, combined_caption, video_url=public_video_url)
         success_flags["threads"] = True
     except Exception as e:
         print(f"❌ Threads upload failed: {e}")

@@ -8,48 +8,13 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
 
-def upload_video_to_github(video_path):
-    repo = os.environ.get('GITHUB_REPOSITORY')
-    token = os.environ.get('GITHUB_TOKEN')
-    if not repo or not token:
-        raise Exception("GITHUB_REPOSITORY or GITHUB_TOKEN not set")
-    
-    h = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'}
-    remote_path = 'output/temp/video.mp4'
-    branch = 'main'
-    
-    # Read video file and encode as base64
-    with open(video_path, 'rb') as f:
-        content_b64 = base64.b64encode(f.read()).decode()
-    
-    # Get current file SHA if exists (for update) or create new
-    r = requests.get(f'https://api.github.com/repos/{repo}/contents/{remote_path}', headers=h)
-    sha = r.json().get('sha') if r.status_code == 200 else None
-    
-    # Upload via GitHub Contents API
-    data = {'message': f'temp video {int(time.time())}', 'content': content_b64, 'branch': branch}
-    if sha:
-        data['sha'] = sha
-    
-    r2 = requests.put(f'https://api.github.com/repos/{repo}/contents/{remote_path}', headers=h, json=data)
-    if r2.status_code not in (200, 201):
-        raise Exception(f"GitHub upload failed ({r2.status_code}): {r2.text[:500]}")
-    
-    owner, name = repo.split('/')
-    video_url = f'https://raw.githubusercontent.com/{owner}/{name}/{branch}/{remote_path}'
-    return video_url, repo, token, remote_path, branch
+try:
+    from upload.video_host import get_public_video_url
+except ImportError:
+    from video_host import get_public_video_url
 
 
-def delete_github_temp_file(repo, token, remote_path, branch='main'):
-    h = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'}
-    r = requests.get(f'https://api.github.com/repos/{repo}/contents/{remote_path}', headers=h)
-    if r.status_code == 200:
-        sha = r.json()['sha']
-        requests.delete(f'https://api.github.com/repos/{repo}/contents/{remote_path}',
-                        headers=h, json={'message': 'cleanup temp video', 'sha': sha, 'branch': branch})
-
-
-def upload_to_instagram(video_path, caption, is_story=False):
+def upload_to_instagram(video_path, caption, is_story=False, video_url=None):
     media_type = 'STORIES' if is_story else 'REELS'
     
     print("\n" + "=" * 60)
@@ -120,9 +85,10 @@ def upload_to_instagram(video_path, caption, is_story=False):
     print(f"[instagram] Caption: {len(caption_limited)} chars")
     
     try:
-        print(f"[instagram] Step 1: Uploading to GitHub raw content...")
-        video_url, repo, token, remote_path, branch = upload_video_to_github(video_path_obj)
-        print(f"[instagram] GitHub URL: {video_url}")
+        print(f"[instagram] Step 1: Acquiring public video URL...")
+        if not video_url:
+            video_url = get_public_video_url(video_path_obj)
+        print(f"[instagram] Video URL: {video_url}")
         
         print(f"[instagram] Step 2: Creating {media_type} container...")
         
@@ -136,7 +102,6 @@ def upload_to_instagram(video_path, caption, is_story=False):
         if not is_story:
             container_params['share_to_feed'] = 'false'
             container_params['caption'] = caption_limited
-
         
         container_resp = requests.post(f"{api_base}/{user_id}/media", params=container_params, timeout=60)
         if container_resp.status_code != 200:
@@ -147,7 +112,7 @@ def upload_to_instagram(video_path, caption, is_story=False):
         print(f"[instagram] Container: {container_id}")
         
         print(f"[instagram] Step 3: Processing...")
-        max_wait = 180
+        max_wait = 300
         waited = 0
         
         while waited < max_wait:
@@ -168,14 +133,12 @@ def upload_to_instagram(video_path, caption, is_story=False):
                 error_code = status_data.get('error_code', 'N/A')
                 print(f"[instagram] Error: {error_msg} (code: {error_code})")
                 print(f"[instagram] Full response: {status_data}")
-                delete_github_temp_file(repo, token, remote_path, branch)
                 raise Exception(f"{error_msg}")
             
-            time.sleep(30)
-            waited += 30
+            time.sleep(10)
+            waited += 10
         
         if waited >= max_wait:
-            delete_github_temp_file(repo, token, remote_path, branch)
             raise Exception("Video processing timed out")
         
         time.sleep(5)
@@ -196,13 +159,10 @@ def upload_to_instagram(video_path, caption, is_story=False):
         
         if not publish_resp or publish_resp.status_code != 200:
             error_msg = publish_resp.json().get('error', {}).get('message', 'Unknown') if publish_resp else 'No response'
-            delete_github_temp_file(repo, token, remote_path, branch)
             raise Exception(f"Publish failed: {error_msg}")
         
         media_id = publish_resp.json().get('id')
         print(f"[instagram] SUCCESS! Media ID: {media_id}")
-        
-        delete_github_temp_file(repo, token, remote_path, branch)
         
         return {'id': media_id, 'platform': 'instagram', 'status': 'success'}
         
