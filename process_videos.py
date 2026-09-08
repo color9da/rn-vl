@@ -92,7 +92,7 @@ def process_single_video(video_path):
     y_delogo = 1920 - h_delogo - 5
 
     print(f"Processing {filename}...")
-    print(f"  Upscaling to: 1080x1920")
+    print(f"  Upscaling to: 1080x1920 (proportional zoom & crop to 9:16 - no stretching)")
     print(f"  Removing watermark at: x={x_delogo}, y={y_delogo}, w={w_delogo}, h={h_delogo}")
     print(f"  Video: ENHANCED (sharpen + clarity boost)")
     if has_audio:
@@ -100,15 +100,23 @@ def process_single_video(video_path):
     else:
         print(f"  Audio: No audio in original video")
 
+    # Proportional scale (zoom to fill 9:16) + center crop + square pixel aspect ratio (no stretching)
+    video_filter = (
+        f"scale='if(gt(a,9/16),-2,1080)':'if(gt(a,9/16),1920,-2)':flags=lanczos,"
+        f"crop=1080:1920,setsar=1,"
+        f"unsharp=5:5:1.0:5:5:0.0,cas=0.7,"
+        f"delogo=x={x_delogo}:y={y_delogo}:w={w_delogo}:h={h_delogo}"
+    )
+
     # Build the filter complex
     if should_loop:
         # For looping: split video, process each, then concat
         # Use aloop for audio (simpler and more efficient)
         vf_base = f"[0:v]split={loop_count}" + "".join([f"[v{i}]" for i in range(loop_count)]) + ";" + \
-                  ";".join([f"[v{i}]scale=1080:1920:flags=lanczos,unsharp=5:5:1.0:5:5:0.0,cas=0.7,delogo=x={x_delogo}:y={y_delogo}:w={w_delogo}:h={h_delogo}[lv{i}]" for i in range(loop_count)]) + ";" + \
+                  ";".join([f"[v{i}]{video_filter}[lv{i}]" for i in range(loop_count)]) + ";" + \
                   f"{'' .join([f'[lv{i}]' for i in range(loop_count)])}concat=n={loop_count}:v=1:a=0[v]"
     else:
-        vf_base = f"[0:v]scale=1080:1920:flags=lanczos,unsharp=5:5:1.0:5:5:0.0,cas=0.7,delogo=x={x_delogo}:y={y_delogo}:w={w_delogo}:h={h_delogo}[v]"
+        vf_base = f"[0:v]{video_filter}[v]"
 
     if has_audio:
         if should_loop:
